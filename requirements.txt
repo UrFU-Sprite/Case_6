@@ -1,0 +1,5 @@
+sentence-transformers>=2.2.2
+faiss-cpu
+numpy
+
+# Note: On Windows, install faiss via conda or omit faiss to use the brute-force fallback.
