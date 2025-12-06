@@ -13,7 +13,7 @@ pip install -r requirements.txt
 2. Run the CLI (from workspace root):
 
 ```powershell
-python -m sber_agent.cli
+python -m sber_agent.agent
 ```
 
 Behavior
