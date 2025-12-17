@@ -6,14 +6,16 @@ Usage
 
 ```powershell
 python -m venv .venv;
-.\.venv\Scripts\Activate.ps1;
+. .venv\Scripts\Activate
 pip install -r requirements.txt
 ```
+# Возможно придется ввести `winget install ffmpeg`
 
 2. Run the CLI (from workspace root):
 
 ```powershell
-python -m sber_agent.agent
+cd sber_agent
+python bot.py
 ```
 
 Behavior
