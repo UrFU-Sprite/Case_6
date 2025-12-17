@@ -4,9 +4,6 @@ import os
 import random
 from typing import Dict, Any, Optional
 from datetime import datetime, timedelta
-import uuid
-import requests
-from pathlib import Path
 
 from aiogram import Bot, Dispatcher, types, F
 from aiogram.filters import Command
@@ -16,12 +13,17 @@ from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton
 from dotenv import load_dotenv
 
+from voiceToTextService import VoiceToTextService
+
+
 # Загружаем переменные окружения из .env файла
 load_dotenv()
 
 # Настройка логирования
 logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO"))
 logger = logging.getLogger(__name__)
+
+converter = VoiceToTextService()
 
 # Конфигурация из переменных окружения
 API_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
@@ -125,58 +127,6 @@ class MockTicketSystem:
             "message": f"Тикет {ticket_id} эскалирован на {target_line} линию поддержки",
             "new_line": target_line
         }
-    
-class VoiceToTextService:
-    def __init__(self):
-        """Получаем токен SaluteSpeech (ctrl C ctrl V с адии)"""
-        # Создадим идентификатор UUID (36 знаков)
-        rq_uid = str(uuid.uuid4())
-        url = "https://ngw.devices.sberbank.ru:9443/api/v2/oauth"
-        ss_token = os.getenv('SALUTE_SPEECH_TOKEN')
-
-        # Заголовки
-        headers = {
-            'Content-Type': 'application/x-www-form-urlencoded',
-            'RqUID': rq_uid,
-            'Authorization': f'Basic {ss_token}'
-        }
-
-        # Тело запроса
-        payload = {'scope': "SALUTE_SPEECH_PERS"}
-
-        try:
-            # Делаем POST запрос с отключенной SSL верификацией
-            # (можно скачать сертификаты Минцифры, тогда отключать проверку не надо)
-            response = requests.post(url, headers=headers, data=payload, verify=False)
-            self.token = response.json()['access_token']
-        except requests.RequestException as e:
-            print(f"Ошибка: {str(e)}")
-
-    async def get_text_from_audio(self, file_path):
-        # URL для распознавания речи
-        url = "https://smartspeech.sber.ru/rest/v1/speech:recognize"
-
-        # Заголовки запроса
-        headers = {
-            "Authorization": f"Bearer {self.token}",
-            "Content-Type": "audio/x-pcm;bit=16;rate=16000"
-        }
-
-        with open(file_path, "rb") as audio_file:
-            audio_data = audio_file.read()
-
-        # Отправка POST запроса
-        response = requests.post(url, headers=headers, data=audio_data, verify=False)
-
-        # Обработка ответа
-        if response.status_code == 200:
-            result = response.json()
-            print("Весь ответ API:", result)
-        else:
-            print("Ошибка:", response.status_code, response.text)
-            return response.text
-
-converter = VoiceToTextService()
 
 
 # ========== СОСТОЯНИЯ БОТА ==========
@@ -449,20 +399,16 @@ async def handle_problem_description(message: types.Message, state: FSMContext):
     if message.text:
         user_problem = message.text
     elif message.voice:
-        file_id = message.voice.file_id
-        file = await bot.get_file(file_id)
-        file_path = file.file_path
-        file_on_disk = Path("", f"files/audio/{file_id}.ogg")
-
-        await bot.download_file(file_path, destination=file_on_disk)
         await message.reply("Аудио получено")
 
-        text = await converter.get_text_from_audio(file_on_disk)
+        text = await converter.process_media_message(bot, message)
+
+        # text = await converter.get_text_from_audio(file_on_disk)
 
         user_problem = text
-        print(f'detected voice message: {user_problem}')
+        await message.answer(f'Распознанное сообщение: {text}')
 
-        os.remove(file_on_disk)
+        # os.remove(file_on_disk)
     await message.answer("🔍 Анализирую вашу проблему...")
     
     # 1. Анализ проблемы через LLM
