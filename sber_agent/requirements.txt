@@ -1,0 +1,5 @@
+langchain_core
+langchain_gigachat
+dotenv
+aiogram
+torch
